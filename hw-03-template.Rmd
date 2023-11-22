@@ -1,15 +1,16 @@
 ---
 title: "hw-03"
-author: "Your Name (S000000)"
+author: "Dimitri Rao (S2526155)"
 date: "`r Sys.Date()`"
 output: html_document
 ---
-
 ```{r setup, include=FALSE}
 ## **DO NOT EDIT THIS CODE CHUNK**
 knitr::opts_chunk$set(echo = TRUE)
 
+
 library(tidyverse)
+library(tidymodels)
 ```
 
 
@@ -89,9 +90,17 @@ a) Fit a linear regression model to predicting `emailhr` based on the `educ`. Fr
 b) Comment on the overall performance of the linear regression model. Support your statements with an appropriate data visualisation and model fit statistics.
 
 ```{r}
+emailhr_fit<-linear_reg()%>%
+  set_engine('lm')%>%
+  fit(emailhr ~ educ,data=gss16_advfront)
+  tidy(emailhr_fit)
 
+ggplot(data=gss16_advfront,aes(x=educ,y=emailhr))+
+  geom_jitter(size=1,alpha=1)+
+  geom_smooth(method='lm',color='blue',se=FALSE)
+glance(emailhr_fit)$r.squared
 ```
-
+Equation of line is y=0.6854031x-2.7573196. The R^2 value of the line is 0.0291194 which is low so the visualisation is not effective.
 ## Exercise 2: Create a workflow to fit a model
 
 In this part, we're going to build a model to predict whether someone agrees or doesn't agree with the following statement:
@@ -118,23 +127,43 @@ The recipe (named `gss16_rec_1`) should contain the following steps for predicti
   - The model (named `gss16_mod_1`) should specify a model that is appropriate for the data as well as the computational engine.
 
 ```{r}
+gss16_mod_1<-logistic_reg()%>%
+  set_engine('glm')
+gss16_mod_1
 
+gss16_rec_1 <- recipe(advfront~educ,data=gss16_train) %>%
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_zv(all_predictors())
+
+gss16_wflow_1<-workflow()%>%
+  add_model(gss16_mod_1)%>%
+  add_recipe(gss16_rec_1)
+gss16_wflow_1
 ```
 
 b) Explain why you have chosen the model that you have selected.
-
+Using logistic regression because Agree and Not Agree are not numerical values, the are categorical values so logistic regression must be used.
 ## Exercise 3: Logistic regression with single predictor
 
 a) Apply the workflow you defined earlier to the training dataset and named the model as `gss16_fit_1`. Display the resulting tibble containing the fitted model parameters. 
 
 ```{r}
-
+gss16_fit_1<-gss16_wflow_1%>%
+  fit(data=gss16_train)
+tidy(gss16_fit_1)%>%
+  print()
 ```
 
 b) Use the fitted models to predict the test data, plot the ROC curves for the predictions.
 
 ```{r}
+gss16_pred_1<-predict(gss16_fit_1,gss16_test,type='prob')%>%
+  bind_cols(gss16_test)
+gss16_pred_1
 
+gss16_pred_1%>%
+  roc_curve(truth=advfront,.pred_Agree,event_level='second')%>%
+  autoplot()
 ```
 
 ## Exercise 4: Logistic regression modelling and interpretation
@@ -155,6 +184,39 @@ named as `gss16_fit_2`.
 Then use the fitted models to predict the test data, plot the ROC curve for the predictions for both models, and calculate the areas under the ROC curves.
 
 ```{r}
+gss16_mod_2<-logistic_reg()%>%
+  set_engine('glm')
+gss16_mod_2
+
+gss16_rec_2 <- recipe(advfront~.,data=gss16_train) %>%
+  step_rm(emailhr)%>%
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_zv(all_predictors())
+
+gss16_wflow_2<-workflow()%>%
+  add_model(gss16_mod_2)%>%
+  add_recipe(gss16_rec_2)
+gss16_wflow_2
+
+gss16_fit_2<-gss16_wflow_2%>%
+  fit(data=gss16_train)
+tidy(gss16_fit_2)%>%
+  print()
+
+gss16_pred_2<-predict(gss16_fit_2,gss16_test,type='prob')%>%
+  bind_cols(gss16_test)
+gss16_pred_2
+
+gss16_pred_2%>%
+  roc_curve(truth=advfront,.pred_Agree,event_level='second')%>%
+  autoplot()
+
+gss16_pred_1%>%
+  roc_auc(truth=advfront,.pred_Agree,event_level='second')
+gss16_pred_2%>%
+  roc_auc(truth=advfront,.pred_Agree,event_level='second')
+
+
 
 ```
 
@@ -164,7 +226,7 @@ b) Comment on which model performs better
   * the model including `polviews`, `wrkstat`, and `educ` with `gss16_split` as model 2 (`gss16_fit_2`)
   
 Explain your reasoning.
-
+Model 2 performs better as more data is being taken into account. Therefore the model will represent more of the data whereas model 1 can only represent one part of the data.
 ```{r}
 
 ```
